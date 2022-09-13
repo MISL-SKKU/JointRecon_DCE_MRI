@@ -1,0 +1,57 @@
+function  [res,WH]= NMF_recon(Input,param)
+%%% NMF
+[nx,ny,nt]=size(Input);
+NMF_real_tmp = Input;
+NMF_real=real(NMF_real_tmp(:,:,1:nt))-repmat(squeeze(real(NMF_real_tmp(:,:,1))),[1,1,nt]);
+NMF_region=NMF_real;
+%% real reconstruction %%
+if param.nmfweight
+ if param.pre_init
+    init_factors = param.init_factors;
+ else
+    NMF_tmp=reshape(abs(NMF_region).*repmat(param.W2,[1,1,nt]),[nx*ny,nt]);
+    x_init = [];
+    options.init_alg = 'semi_random';
+    options.x_init = x_init;
+    options.verbose = 2;
+    options.f_opt = 1;
+    % Hierarchical ALS
+    options.alg = 'hals';
+    [init_factors,~] = nmf_als(NMF_tmp, rank, options);   
+ end
+
+%%% main recon %%%
+   NMF_tmp0=reshape(abs(NMF_region),[nx*ny,nt]);
+   
+   for voxel =1:size(NMF_tmp0)
+     NMF_tmp0(voxel,:) = smooth(NMF_tmp0(voxel,:));
+   end   
+   
+   if param.nmf_prior
+    options.init_alg = 'pre_defined_t';    
+    options.verbose = 2;
+    options.f_opt = 1;   
+    options.lambda =param.pattern_weighting;   % 5e-2;
+    options.type = 'l1r';
+    options.pre_defined = init_factors;
+    options.tolerance = param.tolerance; 
+    [WH] = nenmf((NMF_tmp0)', param.nmf_rank, options);
+
+for r =1:param.nmf_rank
+figure(100),plot(WH.W(:,r)),hold on
+end
+  
+    R_mag_tmp_1=(WH.W*WH.H)';
+    R_mag_tmp_res= R_mag_tmp_1;
+    R_mag_tmp_res=reshape(R_mag_tmp_res,[nx,ny,nt]);
+    R_mag_tmp_res=reshape(R_mag_tmp_res,[nx,ny,nt])+repmat(real(NMF_real_tmp(:,:,1)),[1,1,nt]);
+   else
+    R_mag_tmp_res=zeros(nx,ny,nt);
+   end
+res= R_mag_tmp_res;
+end
+
+
+
+
+
